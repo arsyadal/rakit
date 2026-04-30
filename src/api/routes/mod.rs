@@ -1,6 +1,6 @@
 //! Route grouping per resource.
 
-use axum::{routing::{get, patch, post, put}, Router};
+use axum::{routing::{get, post}, Router};
 
 use crate::api::{handlers, AppState};
 

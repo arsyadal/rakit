@@ -1,9 +1,78 @@
 //! Service functions for the `Content` resource.
 
+use chrono::{DateTime, Utc};
 use serde_json::Value;
+use sqlx::{Postgres, QueryBuilder};
 use uuid::Uuid;
 
-use crate::{db::DbPool, errors::ApiError, models::content::Content, utils::validate_collection_name};
+use crate::{
+    db::DbPool,
+    errors::ApiError,
+    models::content::Content,
+    utils::{validate_collection_name, validate_identifier},
+};
+
+#[derive(Debug, Clone)]
+pub struct ListOptions {
+    pub filters: Vec<FilterExpr>,
+    pub sort: Option<SortSpec>,
+    pub limit: u32,
+    pub offset: u32,
+}
+
+impl Default for ListOptions {
+    fn default() -> Self {
+        Self {
+            filters: vec![],
+            sort: None,
+            limit: 20,
+            offset: 0,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct FilterExpr {
+    pub field: FilterField,
+    pub op: FilterOp,
+    pub value: String,
+}
+
+#[derive(Debug, Clone)]
+pub enum FilterField {
+    Meta(MetaField),
+    Data(String),
+}
+
+#[derive(Debug, Clone)]
+pub enum MetaField {
+    Id,
+    CreatedAt,
+    UpdatedAt,
+}
+
+#[derive(Debug, Clone)]
+pub enum FilterOp {
+    Eq,
+    Ne,
+    Contains,
+    Gt,
+    Gte,
+    Lt,
+    Lte,
+}
+
+#[derive(Debug, Clone)]
+pub struct SortSpec {
+    pub field: SortField,
+    pub desc: bool,
+}
+
+#[derive(Debug, Clone)]
+pub enum SortField {
+    Meta(MetaField),
+    Data(String),
+}
 
 pub async fn create(pool: &DbPool, collection: &str, data: Value) -> Result<Content, ApiError> {
     validate_collection_name(collection)?;
@@ -23,15 +92,30 @@ pub async fn create(pool: &DbPool, collection: &str, data: Value) -> Result<Cont
     Ok(row)
 }
 
-pub async fn list(pool: &DbPool, collection: &str) -> Result<Vec<Content>, ApiError> {
+pub async fn list(pool: &DbPool, collection: &str, options: ListOptions) -> Result<Vec<Content>, ApiError> {
     validate_collection_name(collection)?;
 
-    let rows = sqlx::query_as::<_, Content>(
-        "SELECT id, collection, data, created_at, updated_at FROM contents WHERE collection = $1 ORDER BY created_at DESC LIMIT 100",
-    )
-    .bind(collection)
-    .fetch_all(pool)
-    .await?;
+    let mut qb = QueryBuilder::<Postgres>::new(
+        "SELECT id, collection, data, created_at, updated_at FROM contents WHERE collection = ",
+    );
+    qb.push_bind(collection);
+
+    for filter in options.filters {
+        qb.push(" AND ");
+        push_filter(&mut qb, filter)?;
+    }
+
+    qb.push(" ORDER BY ");
+    push_sort(&mut qb, options.sort)?;
+
+    let limit = options.limit.clamp(1, 100);
+    qb.push(" LIMIT ");
+    qb.push_bind(limit as i64);
+
+    qb.push(" OFFSET ");
+    qb.push_bind(options.offset as i64);
+
+    let rows = qb.build_query_as::<Content>().fetch_all(pool).await?;
     Ok(rows)
 }
 
@@ -111,4 +195,148 @@ pub async fn patch(
     .await?
     .ok_or(ApiError::NotFound)?;
     Ok(row)
+}
+
+fn push_filter(qb: &mut QueryBuilder<'_, Postgres>, filter: FilterExpr) -> Result<(), ApiError> {
+    match filter.field {
+        FilterField::Data(key) => push_data_filter(qb, &key, filter.op, &filter.value),
+        FilterField::Meta(meta) => push_meta_filter(qb, meta, filter.op, &filter.value),
+    }
+}
+
+fn push_data_filter(
+    qb: &mut QueryBuilder<'_, Postgres>,
+    key: &str,
+    op: FilterOp,
+    value: &str,
+) -> Result<(), ApiError> {
+    validate_identifier(key)?;
+    let expr = format!("data->>'{}'", key);
+
+    match op {
+        FilterOp::Eq => {
+            qb.push(&expr);
+            qb.push(" = ");
+            qb.push_bind(value.to_string());
+        }
+        FilterOp::Ne => {
+            qb.push(&expr);
+            qb.push(" <> ");
+            qb.push_bind(value.to_string());
+        }
+        FilterOp::Contains => {
+            qb.push(&expr);
+            qb.push(" ILIKE ");
+            qb.push_bind(format!("%{}%", value));
+        }
+        FilterOp::Gt | FilterOp::Gte | FilterOp::Lt | FilterOp::Lte => {
+            return Err(ApiError::BadRequest(
+                "comparison operators gt/gte/lt/lte are only supported for metadata fields in v1".into(),
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+fn push_meta_filter(
+    qb: &mut QueryBuilder<'_, Postgres>,
+    meta: MetaField,
+    op: FilterOp,
+    value: &str,
+) -> Result<(), ApiError> {
+    let column = match meta {
+        MetaField::Id => "id",
+        MetaField::CreatedAt => "created_at",
+        MetaField::UpdatedAt => "updated_at",
+    };
+
+    match meta {
+        MetaField::Id => {
+            let parsed = Uuid::parse_str(value)
+                .map_err(|_| ApiError::BadRequest("invalid UUID for id filter".into()))?;
+            match op {
+                FilterOp::Eq => {
+                    qb.push(column);
+                    qb.push(" = ");
+                    qb.push_bind(parsed);
+                }
+                FilterOp::Ne => {
+                    qb.push(column);
+                    qb.push(" <> ");
+                    qb.push_bind(parsed);
+                }
+                _ => {
+                    return Err(ApiError::BadRequest(
+                        "only eq/ne are supported for id filters".into(),
+                    ));
+                }
+            }
+        }
+        MetaField::CreatedAt | MetaField::UpdatedAt => {
+            let parsed = DateTime::parse_from_rfc3339(value)
+                .map_err(|_| ApiError::BadRequest("invalid RFC3339 datetime".into()))?
+                .with_timezone(&Utc);
+
+            qb.push(column);
+            match op {
+                FilterOp::Eq => {
+                    qb.push(" = ");
+                }
+                FilterOp::Ne => {
+                    qb.push(" <> ");
+                }
+                FilterOp::Gt => {
+                    qb.push(" > ");
+                }
+                FilterOp::Gte => {
+                    qb.push(" >= ");
+                }
+                FilterOp::Lt => {
+                    qb.push(" < ");
+                }
+                FilterOp::Lte => {
+                    qb.push(" <= ");
+                }
+                FilterOp::Contains => {
+                    return Err(ApiError::BadRequest(
+                        "contains is not supported for datetime filters".into(),
+                    ));
+                }
+            }
+            qb.push_bind(parsed);
+        }
+    }
+
+    Ok(())
+}
+
+fn push_sort(qb: &mut QueryBuilder<'_, Postgres>, sort: Option<SortSpec>) -> Result<(), ApiError> {
+    let spec = sort.unwrap_or(SortSpec {
+        field: SortField::Meta(MetaField::CreatedAt),
+        desc: true,
+    });
+
+    match spec.field {
+        SortField::Meta(meta) => {
+            let column = match meta {
+                MetaField::Id => "id",
+                MetaField::CreatedAt => "created_at",
+                MetaField::UpdatedAt => "updated_at",
+            };
+            qb.push(column);
+        }
+        SortField::Data(key) => {
+            validate_identifier(&key)?;
+            qb.push(format!("data->>'{}'", key));
+        }
+    }
+
+    if spec.desc {
+        qb.push(" DESC");
+    } else {
+        qb.push(" ASC");
+    }
+
+    Ok(())
 }
