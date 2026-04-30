@@ -30,7 +30,7 @@ and orders of magnitude better throughput.
 
 | # | Plan | Status | Depends on | Effort | Notes |
 |---|------|--------|------------|--------|-------|
-| 0001 | [Auth — JWT + Argon2](./plans/0001-auth-jwt.md) | 🟡 Draft | — | M | Foundation for every protected endpoint |
+| 0001 | [Auth — JWT + Argon2](./plans/0001-auth-jwt.md) | ✅ Done | — | M | Foundation for every protected endpoint |
 | 0002 | [Content Update endpoint (PUT/PATCH)](./plans/0002-content-update.md) | ✅ Done | — | S | Completes CRUD |
 | 0003 | [Collections / Content Types](./plans/0003-collections.md) | ✅ Done | 0002 | M | Namespacing for `posts`, `products`, etc. |
 | 0004 | [Query & Filter API](./plans/0004-query-filter.md) | 🟡 Draft | 0003 | M | jsonb GIN-powered filtering |
