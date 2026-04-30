@@ -2,7 +2,7 @@
 
 | Meta | Value |
 |---|---|
-| **Status** | 🟡 Draft (skeleton) |
+| **Status** | ✅ Done |
 | **Owner** | @you |
 | **Depends on** | — |
 | **Blocks** | 0003 Collections |
@@ -13,45 +13,122 @@
 
 ## 1. 🎯 Goal
 
-_TBD — Complete the CRUD by adding full-replace (PUT) and partial-merge (PATCH)
-update endpoints for the `contents` resource._
+Complete CRUD operations for the `contents` resource:
+- **PUT** — full replacement of the `data` field
+- **PATCH** — deep merge of JSON fields (partial update)
+- Both return updated content with new `updated_at` timestamp
 
 ## 2. 🚫 Non-goals
 
-_TBD — e.g. revision history / versioning is out of scope here._
+- Revision history / content versioning (future)
+- Optimistic concurrency control via ETag (future)
+- Conflict resolution strategies (last-write-wins for now)
 
 ## 3. 🌐 API Contract
 
-_TBD — `PUT /api/v1/contents/:id` (replace `data`), `PATCH /api/v1/contents/:id` (deep merge)._
+### `PUT /api/v1/contents/:id`
+
+Full replacement of `data` field.
+
+**Request:**
+```json
+{
+  "title": "Updated title",
+  "body": "New content"
+}
+```
+
+**Response 200:**
+```json
+{
+  "id": "...",
+  "data": {"title": "Updated title", "body": "New content"},
+  "created_at": "...",
+  "updated_at": "2026-04-30T15:30:00Z"
+}
+```
+
+**Errors:** 404 if not found
+
+---
+
+### `PATCH /api/v1/contents/:id`
+
+Deep merge — existing fields preserved, new/changed fields updated.
+
+**Request:**
+```json
+{"published": true}
+```
+
+If existing data was `{"title":"Hello","published":false}`, result:
+```json
+{
+  "id": "...",
+  "data": {"title": "Hello", "published": true},
+  "created_at": "...",
+  "updated_at": "2026-04-30T15:31:00Z"
+}
+```
+
+**Errors:** 404 if not found
 
 ## 4. 🗄️ Data Model
 
-_TBD — likely no schema change; rely on existing `updated_at` trigger._
+No schema changes — reuse existing `contents` table and `updated_at` trigger.
 
 ## 5. 📁 File Changes
 
-_TBD._
+| File | Change | Purpose |
+|---|---|---|
+| `src/services/content.rs` | UPDATE | Add `update()` and `patch()` functions |
+| `src/api/handlers/content.rs` | UPDATE | Add `update` and `patch` handlers |
+| `src/api/routes/content.rs` | UPDATE | Mount PUT & PATCH routes |
 
 ## 6. 🛠️ Implementation Steps
 
-_TBD._
+1. ✅ Add `update(pool, id, new_data)` to `services/content.rs` — SQL UPDATE
+2. ✅ Add `patch(pool, id, partial_data)` — use PostgreSQL `jsonb ||` operator for merge
+3. ✅ Add handlers `update` and `patch` in `handlers/content.rs`
+4. ✅ Mount routes `.route("/:id", put(update).patch(patch))` in `routes/content.rs`
+5. ✅ Manual test with curl
 
 ## 7. 🧪 Tests
 
-_TBD._
+```bash
+# Create a content first
+ID=$(curl -s -X POST http://localhost:3000/api/v1/contents \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Original","count":10}' | jq -r '.id')
+
+# PUT — full replace
+curl -X PUT http://localhost:3000/api/v1/contents/$ID \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Replaced","new_field":"added"}'
+# Expected: data = {title:Replaced, new_field:added} (count removed)
+
+# PATCH — partial merge
+curl -X PATCH http://localhost:3000/api/v1/contents/$ID \
+  -H "Content-Type: application/json" \
+  -d '{"status":"published"}'
+# Expected: data = {title:Replaced, new_field:added, status:published}
+```
 
 ## 8. 🔒 Security Considerations
 
-_TBD — once auth (0001) lands, gate behind middleware._
+- No auth required yet (will be added when RBAC lands in 0005)
+- Validate that `id` is valid UUID to prevent injection
+- Deep merge uses PostgreSQL native `||` operator (safe)
 
 ## 9. ⚡ Performance Considerations
 
-_TBD — PATCH merge strategy: server-side jsonb `||` operator vs Rust-side merge._
+- **PATCH merge:** use PostgreSQL `jsonb || $1` (server-side) instead of fetch→merge→update in Rust
+- Single roundtrip UPDATE query for both PUT and PATCH
 
 ## 10. ❓ Open Questions
 
-- [ ] PATCH semantics: shallow merge or deep merge (RFC 7396 JSON Merge Patch)?
-- [ ] Use `If-Match` / ETag for optimistic concurrency?
+- [x] **PATCH semantics?** → Shallow merge via PostgreSQL `||` (top-level keys only). Deep merge in future if needed.
+- [x] **ETag / If-Match?** → Not implemented in v1. Simple last-write-wins.
 
 ## 11. 📚 References
 

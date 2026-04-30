@@ -50,3 +50,37 @@ pub async fn delete(pool: &DbPool, id: Uuid) -> Result<(), ApiError> {
     }
     Ok(())
 }
+
+pub async fn update(pool: &DbPool, id: Uuid, new_data: Value) -> Result<Content, ApiError> {
+    let row = sqlx::query_as::<_, Content>(
+        r#"
+        UPDATE contents
+        SET data = $1
+        WHERE id = $2
+        RETURNING id, data, created_at, updated_at
+        "#,
+    )
+    .bind(new_data)
+    .bind(id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or(ApiError::NotFound)?;
+    Ok(row)
+}
+
+pub async fn patch(pool: &DbPool, id: Uuid, partial_data: Value) -> Result<Content, ApiError> {
+    let row = sqlx::query_as::<_, Content>(
+        r#"
+        UPDATE contents
+        SET data = data || $1
+        WHERE id = $2
+        RETURNING id, data, created_at, updated_at
+        "#,
+    )
+    .bind(partial_data)
+    .bind(id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or(ApiError::NotFound)?;
+    Ok(row)
+}
