@@ -40,3 +40,21 @@ pub async fn delete(
     content::delete(&state.pool, id).await?;
     Ok(Json(serde_json::json!({ "deleted": id })))
 }
+
+pub async fn update(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<Value>,
+) -> Result<Json<Content>, ApiError> {
+    let item = content::update(&state.pool, id, payload).await?;
+    Ok(Json(item))
+}
+
+pub async fn patch(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<Value>,
+) -> Result<Json<Content>, ApiError> {
+    let item = content::patch(&state.pool, id, payload).await?;
+    Ok(Json(item))
+}
