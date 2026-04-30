@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: rakit-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: rakit
+      POSTGRES_PASSWORD: rakit
+      POSTGRES_DB: rakit
+    ports:
+      - "5434:5432"
+    volumes:
+      - rakit_pgdata:/var/lib/postgresql/data
+
+volumes:
+  rakit_pgdata:
