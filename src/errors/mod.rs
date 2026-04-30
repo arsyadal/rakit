@@ -19,6 +19,9 @@ pub enum ApiError {
     #[error("unauthorized")]
     Unauthorized,
 
+    #[error("forbidden")]
+    Forbidden,
+
     #[error("conflict: resource already exists")]
     Conflict,
 
@@ -35,6 +38,7 @@ impl IntoResponse for ApiError {
             ApiError::NotFound => (StatusCode::NOT_FOUND, self.to_string()),
             ApiError::BadRequest(_) => (StatusCode::BAD_REQUEST, self.to_string()),
             ApiError::Unauthorized => (StatusCode::UNAUTHORIZED, self.to_string()),
+            ApiError::Forbidden => (StatusCode::FORBIDDEN, self.to_string()),
             ApiError::Conflict => (StatusCode::CONFLICT, self.to_string()),
             ApiError::Database(e) => {
                 tracing::error!("DB error: {e}");

@@ -2,6 +2,7 @@
 
 use axum::{
     extract::{Path, Query, State},
+    http::HeaderMap,
     Json,
 };
 use serde::Deserialize;
@@ -52,8 +53,10 @@ impl ListQuery {
 pub async fn create(
     State(state): State<AppState>,
     Path(collection): Path<String>,
+    headers: HeaderMap,
     Json(payload): Json<Value>,
 ) -> Result<Json<Content>, ApiError> {
+    crate::middleware::rbac::authorize_collection_action(&state, &headers, "create", &collection).await?;
     let item = content::create(&state.pool, &collection, payload).await?;
     Ok(Json(item))
 }
@@ -61,8 +64,10 @@ pub async fn create(
 pub async fn list(
     State(state): State<AppState>,
     Path(collection): Path<String>,
+    headers: HeaderMap,
     Query(query): Query<ListQuery>,
 ) -> Result<Json<Vec<Content>>, ApiError> {
+    crate::middleware::rbac::authorize_collection_action(&state, &headers, "read", &collection).await?;
     let options = query.into_options()?;
     let items = content::list(&state.pool, &collection, options).await?;
     Ok(Json(items))
@@ -71,7 +76,9 @@ pub async fn list(
 pub async fn get_one(
     State(state): State<AppState>,
     Path((collection, id)): Path<(String, Uuid)>,
+    headers: HeaderMap,
 ) -> Result<Json<Content>, ApiError> {
+    crate::middleware::rbac::authorize_collection_action(&state, &headers, "read", &collection).await?;
     let item = content::get(&state.pool, &collection, id).await?;
     Ok(Json(item))
 }
@@ -79,7 +86,9 @@ pub async fn get_one(
 pub async fn delete(
     State(state): State<AppState>,
     Path((collection, id)): Path<(String, Uuid)>,
+    headers: HeaderMap,
 ) -> Result<Json<Value>, ApiError> {
+    crate::middleware::rbac::authorize_collection_action(&state, &headers, "delete", &collection).await?;
     content::delete(&state.pool, &collection, id).await?;
     Ok(Json(serde_json::json!({ "deleted": id })))
 }
@@ -87,8 +96,10 @@ pub async fn delete(
 pub async fn update(
     State(state): State<AppState>,
     Path((collection, id)): Path<(String, Uuid)>,
+    headers: HeaderMap,
     Json(payload): Json<Value>,
 ) -> Result<Json<Content>, ApiError> {
+    crate::middleware::rbac::authorize_collection_action(&state, &headers, "update", &collection).await?;
     let item = content::update(&state.pool, &collection, id, payload).await?;
     Ok(Json(item))
 }
@@ -96,8 +107,10 @@ pub async fn update(
 pub async fn patch(
     State(state): State<AppState>,
     Path((collection, id)): Path<(String, Uuid)>,
+    headers: HeaderMap,
     Json(payload): Json<Value>,
 ) -> Result<Json<Content>, ApiError> {
+    crate::middleware::rbac::authorize_collection_action(&state, &headers, "update", &collection).await?;
     let item = content::patch(&state.pool, &collection, id, payload).await?;
     Ok(Json(item))
 }
