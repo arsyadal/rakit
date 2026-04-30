@@ -14,29 +14,51 @@ use crate::{api::AppState, errors::ApiError, models::content::Content, services:
 
 pub async fn create(
     State(state): State<AppState>,
+    Path(collection): Path<String>,
     Json(payload): Json<Value>,
 ) -> Result<Json<Content>, ApiError> {
-    let item = content::create(&state.pool, payload).await?;
+    let item = content::create(&state.pool, &collection, payload).await?;
     Ok(Json(item))
 }
 
-pub async fn list(State(state): State<AppState>) -> Result<Json<Vec<Content>>, ApiError> {
-    let items = content::list(&state.pool).await?;
+pub async fn list(
+    State(state): State<AppState>,
+    Path(collection): Path<String>,
+) -> Result<Json<Vec<Content>>, ApiError> {
+    let items = content::list(&state.pool, &collection).await?;
     Ok(Json(items))
 }
 
 pub async fn get_one(
     State(state): State<AppState>,
-    Path(id): Path<Uuid>,
+    Path((collection, id)): Path<(String, Uuid)>,
 ) -> Result<Json<Content>, ApiError> {
-    let item = content::get(&state.pool, id).await?;
+    let item = content::get(&state.pool, &collection, id).await?;
     Ok(Json(item))
 }
 
 pub async fn delete(
     State(state): State<AppState>,
-    Path(id): Path<Uuid>,
+    Path((collection, id)): Path<(String, Uuid)>,
 ) -> Result<Json<Value>, ApiError> {
-    content::delete(&state.pool, id).await?;
+    content::delete(&state.pool, &collection, id).await?;
     Ok(Json(serde_json::json!({ "deleted": id })))
+}
+
+pub async fn update(
+    State(state): State<AppState>,
+    Path((collection, id)): Path<(String, Uuid)>,
+    Json(payload): Json<Value>,
+) -> Result<Json<Content>, ApiError> {
+    let item = content::update(&state.pool, &collection, id, payload).await?;
+    Ok(Json(item))
+}
+
+pub async fn patch(
+    State(state): State<AppState>,
+    Path((collection, id)): Path<(String, Uuid)>,
+    Json(payload): Json<Value>,
+) -> Result<Json<Content>, ApiError> {
+    let item = content::patch(&state.pool, &collection, id, payload).await?;
+    Ok(Json(item))
 }

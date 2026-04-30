@@ -8,6 +8,7 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Content {
     pub id: Uuid,
+    pub collection: String,
     pub data: Value,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
