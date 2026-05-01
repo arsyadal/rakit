@@ -9,6 +9,7 @@ use crate::{
     db::DbPool,
     errors::ApiError,
     models::content::Content,
+    services::schema,
     utils::{validate_collection_name, validate_identifier},
 };
 
@@ -76,6 +77,7 @@ pub enum SortField {
 
 pub async fn create(pool: &DbPool, collection: &str, data: Value) -> Result<Content, ApiError> {
     validate_collection_name(collection)?;
+    schema::validate_payload_for_collection(pool, collection, &data).await?;
 
     let row = sqlx::query_as::<_, Content>(
         r#"
@@ -154,6 +156,7 @@ pub async fn update(
     new_data: Value,
 ) -> Result<Content, ApiError> {
     validate_collection_name(collection)?;
+    schema::validate_payload_for_collection(pool, collection, &new_data).await?;
 
     let row = sqlx::query_as::<_, Content>(
         r#"
@@ -180,15 +183,19 @@ pub async fn patch(
 ) -> Result<Content, ApiError> {
     validate_collection_name(collection)?;
 
+    let current = get(pool, collection, id).await?;
+    let merged = schema::merge_patch(&current.data, &partial_data)?;
+    schema::validate_payload_for_collection(pool, collection, &merged).await?;
+
     let row = sqlx::query_as::<_, Content>(
         r#"
         UPDATE contents
-        SET data = data || $1
+        SET data = $1
         WHERE collection = $2 AND id = $3
         RETURNING id, collection, data, created_at, updated_at
         "#,
     )
-    .bind(partial_data)
+    .bind(merged)
     .bind(collection)
     .bind(id)
     .fetch_optional(pool)

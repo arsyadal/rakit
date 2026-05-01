@@ -1,6 +1,6 @@
 //! Route grouping per resource.
 
-use axum::{routing::{get, post}, Router};
+use axum::{routing::{get, post, put}, Router};
 
 use crate::api::{handlers, AppState};
 
@@ -27,4 +27,9 @@ pub fn admin_routes() -> Router<AppState> {
         .route("/roles", get(handlers::admin::list_roles))
         .route("/permissions", get(handlers::admin::list_permissions))
         .route("/users/:id/role", post(handlers::admin::assign_user_role))
+}
+
+pub fn schema_routes() -> Router<AppState> {
+    Router::new()
+        .route("/:collection", put(handlers::schema::upsert).get(handlers::schema::get))
 }
