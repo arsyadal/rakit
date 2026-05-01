@@ -15,7 +15,7 @@ pub struct AppState {
 }
 
 pub fn router(state: AppState) -> Router {
-    let protected_routes = Router::new()
+    let auth_me = Router::new()
         .route("/api/v1/auth/me", get(handlers::auth::me))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
@@ -25,8 +25,10 @@ pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/", get(handlers::health::root))
         .route("/health", get(handlers::health::health))
-        .nest("/api/v1", routes::api_v1())
-        .merge(protected_routes)
+        .nest("/api/v1/auth", routes::auth_routes())
+        .nest("/api/v1/:collection", routes::collection_routes())
+        .nest("/api/v1/admin", routes::admin_routes())
+        .merge(auth_me)
         .with_state(state)
         .layer(TraceLayer::new_for_http())
         .layer(CompressionLayer::new())

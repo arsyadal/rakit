@@ -34,7 +34,7 @@ and orders of magnitude better throughput.
 | 0002 | [Content Update endpoint (PUT/PATCH)](./plans/0002-content-update.md) | ✅ Done | — | S | Completes CRUD |
 | 0003 | [Collections / Content Types](./plans/0003-collections.md) | ✅ Done | 0002 | M | Namespacing for `posts`, `products`, etc. |
 | 0004 | [Query & Filter API](./plans/0004-query-filter.md) | ✅ Done | 0003 | M | jsonb GIN-powered filtering |
-| 0005 | [RBAC — Roles & Permissions](./plans/0005-rbac.md) | 🟡 Draft | 0001, 0003 | L | Per-collection access control |
+| 0005 | [RBAC — Roles & Permissions](./plans/0005-rbac.md) | ✅ Done | 0001, 0003 | L | Per-collection access control |
 | 0006 | [Schema Validation per Collection](./plans/0006-schema-validation.md) | 🟡 Draft | 0003 | M | Optional JSON Schema enforcement |
 | 0007 | [Webhooks](./plans/0007-webhooks.md) | 🟡 Draft | 0003 | M | Outbound events on mutation |
 | 0008 | [Media / File Uploads](./plans/0008-media-uploads.md) | 🟡 Draft | 0001 | L | S3-compatible storage |

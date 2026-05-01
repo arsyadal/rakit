@@ -12,6 +12,7 @@ use crate::{
     db::DbPool,
     errors::ApiError,
     models::user::{Claims, User, UserRow},
+    services::rbac,
 };
 
 /// Register a new user
@@ -54,6 +55,13 @@ pub async fn register(pool: &DbPool, email: &str, password: &str) -> Result<User
             ApiError::Database(e)
         }
     })?;
+
+    let role_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
+        .fetch_one(pool)
+        .await?;
+
+    let default_role = if role_count == 1 { "admin" } else { "editor" };
+    rbac::assign_role_to_user(pool, row.id, default_role).await?;
 
     Ok(row.into())
 }
