@@ -9,7 +9,7 @@ use crate::{
     db::DbPool,
     errors::ApiError,
     models::content::Content,
-    services::schema,
+    services::{schema, webhook::{self, WebhookEventKind}},
     utils::{validate_collection_name, validate_identifier},
 };
 
@@ -91,6 +91,8 @@ pub async fn create(pool: &DbPool, collection: &str, data: Value) -> Result<Cont
     .bind(data)
     .fetch_one(pool)
     .await?;
+
+    emit_webhook_event(pool, collection, WebhookEventKind::Created, row.data.clone());
     Ok(row)
 }
 
@@ -138,6 +140,7 @@ pub async fn get(pool: &DbPool, collection: &str, id: Uuid) -> Result<Content, A
 pub async fn delete(pool: &DbPool, collection: &str, id: Uuid) -> Result<(), ApiError> {
     validate_collection_name(collection)?;
 
+    let current = get(pool, collection, id).await?;
     let result = sqlx::query("DELETE FROM contents WHERE collection = $1 AND id = $2")
         .bind(collection)
         .bind(id)
@@ -146,6 +149,8 @@ pub async fn delete(pool: &DbPool, collection: &str, id: Uuid) -> Result<(), Api
     if result.rows_affected() == 0 {
         return Err(ApiError::NotFound);
     }
+
+    emit_webhook_event(pool, collection, WebhookEventKind::Deleted, current.data.clone());
     Ok(())
 }
 
@@ -172,6 +177,8 @@ pub async fn update(
     .fetch_optional(pool)
     .await?
     .ok_or(ApiError::NotFound)?;
+
+    emit_webhook_event(pool, collection, WebhookEventKind::Updated, row.data.clone());
     Ok(row)
 }
 
@@ -195,12 +202,14 @@ pub async fn patch(
         RETURNING id, collection, data, created_at, updated_at
         "#,
     )
-    .bind(merged)
+    .bind(merged.clone())
     .bind(collection)
     .bind(id)
     .fetch_optional(pool)
     .await?
     .ok_or(ApiError::NotFound)?;
+
+    emit_webhook_event(pool, collection, WebhookEventKind::Updated, row.data.clone());
     Ok(row)
 }
 
@@ -346,4 +355,12 @@ fn push_sort(qb: &mut QueryBuilder<'_, Postgres>, sort: Option<SortSpec>) -> Res
     }
 
     Ok(())
+}
+
+fn emit_webhook_event(pool: &DbPool, collection: &str, event: WebhookEventKind, content: Value) {
+    let pool = pool.clone();
+    let collection = collection.to_string();
+    tokio::spawn(async move {
+        webhook::emit_event(pool, collection, event, content).await;
+    });
 }

@@ -33,3 +33,9 @@ pub fn schema_routes() -> Router<AppState> {
     Router::new()
         .route("/:collection", put(handlers::schema::upsert).get(handlers::schema::get))
 }
+
+pub fn webhook_routes() -> Router<AppState> {
+    Router::new()
+        .route("/", post(handlers::webhook::create).get(handlers::webhook::list))
+        .route("/:id", axum::routing::delete(handlers::webhook::delete))
+}
