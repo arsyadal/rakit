@@ -39,3 +39,10 @@ pub fn webhook_routes() -> Router<AppState> {
         .route("/", post(handlers::webhook::create).get(handlers::webhook::list))
         .route("/:id", axum::routing::delete(handlers::webhook::delete))
 }
+
+pub fn media_routes() -> Router<AppState> {
+    Router::new()
+        .route("/", post(handlers::media::upload).get(handlers::media::list))
+        .route("/:id", get(handlers::media::get).delete(handlers::media::delete))
+        .route("/:id/download", get(handlers::media::download))
+}

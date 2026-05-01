@@ -22,12 +22,18 @@ pub fn router(state: AppState) -> Router {
             crate::middleware::auth::require_auth,
         ));
 
+    let media_routes = routes::media_routes().route_layer(middleware::from_fn_with_state(
+        state.clone(),
+        crate::middleware::auth::require_auth,
+    ));
+
     Router::new()
         .route("/", get(handlers::health::root))
         .route("/health", get(handlers::health::health))
         .nest("/api/v1/auth", routes::auth_routes())
         .nest("/api/v1/_schemas", routes::schema_routes())
         .nest("/api/v1/_webhooks", routes::webhook_routes())
+        .nest("/api/v1/_media", media_routes)
         .nest("/api/v1/:collection", routes::collection_routes())
         .nest("/api/v1/admin", routes::admin_routes())
         .merge(auth_me)

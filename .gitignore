@@ -1,6 +1,7 @@
 /target
 /.env
 *.log
+/uploads/
 .DS_Store
 .idea/
 .vscode/
