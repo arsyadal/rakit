@@ -27,6 +27,7 @@ pub fn router(state: AppState) -> Router {
         .route("/health", get(handlers::health::health))
         .nest("/api/v1/auth", routes::auth_routes())
         .nest("/api/v1/_schemas", routes::schema_routes())
+        .nest("/api/v1/_webhooks", routes::webhook_routes())
         .nest("/api/v1/:collection", routes::collection_routes())
         .nest("/api/v1/admin", routes::admin_routes())
         .merge(auth_me)
