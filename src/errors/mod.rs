@@ -30,6 +30,9 @@ pub enum ApiError {
 
     #[error("internal server error: {0}")]
     Internal(#[from] anyhow::Error),
+
+    #[error("io error: {0}")]
+    Io(#[from] std::io::Error),
 }
 
 impl IntoResponse for ApiError {
@@ -47,6 +50,10 @@ impl IntoResponse for ApiError {
             ApiError::Internal(e) => {
                 tracing::error!("Internal error: {e}");
                 (StatusCode::INTERNAL_SERVER_ERROR, "internal error".into())
+            }
+            ApiError::Io(e) => {
+                tracing::error!("IO error: {e}");
+                (StatusCode::INTERNAL_SERVER_ERROR, "io error".into())
             }
         };
         (status, Json(json!({ "error": message }))).into_response()

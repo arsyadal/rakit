@@ -170,6 +170,18 @@ PATCH /api/v1/posts/<id>
 
 ---
 
+### Media (Uploads)
+
+| Endpoint | Method | Auth | Description |
+|---|---|---|---|
+| `/api/v1/_media` | POST | JWT | Upload file via multipart form data |
+| `/api/v1/_media` | GET | JWT | List current user's media |
+| `/api/v1/_media/:id` | GET | JWT | Get media metadata |
+| `/api/v1/_media/:id/download` | GET | JWT | Download file |
+| `/api/v1/_media/:id` | DELETE | JWT | Delete media |
+
+---
+
 ## 📁 Project Structure
 
 ```
